@@ -11,12 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:app_valitrack/main.dart';
 
 void main() {
-  testWidgets('app starts at login page', (WidgetTester tester) async {
+  testWidgets('app starts with dashboard', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const ValitrackApp());
 
     // Verify that our counter starts at 0.
-    expect(find.text('Valitrack'), findsOneWidget);
-    expect(find.text('Entrar'), findsOneWidget);
+    expect(find.text('ValiStock'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
   });
 }

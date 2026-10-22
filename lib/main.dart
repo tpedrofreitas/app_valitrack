@@ -39,13 +39,18 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController(text: '123456');
   final _formKey = GlobalKey<FormState>();
 
+  @override
+  void dispose() {
+    _userController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   void _login() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
     final user = _userController.text.trim();
     final password = _passwordController.text.trim();
-
-    if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
-      return;
-    }
 
     if (user == 'admin' && password == '123456') {
       Navigator.of(
@@ -168,7 +173,7 @@ class _LoginPageState extends State<LoginPage> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
-                        onPressed: () => _login(),
+                        onPressed: _login,
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           backgroundColor: const Color(0xFF1E8E76),
@@ -321,6 +326,7 @@ class _AppShellState extends State<AppShell> {
       products: _products,
       movements: _movements,
       onAdd: _showQuickAddDialog,
+      onLogout: _showLogoutDialog,
     ),
     ProdutosPage(
       products: _products,
@@ -457,6 +463,13 @@ class _AppShellState extends State<AppShell> {
         );
       },
     );
+
+    nameController.dispose();
+    codeController.dispose();
+    categoryController.dispose();
+    stockController.dispose();
+    minimumController.dispose();
+    validityController.dispose();
   }
 
   Future<void> _showQuickAddDialog() async {
@@ -512,17 +525,8 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Sem AppBar aqui: cada página já tem o seu próprio Scaffold/AppBar.
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ValiStock'),
-        actions: [
-          IconButton(
-            onPressed: _showLogoutDialog,
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Sair',
-          ),
-        ],
-      ),
       body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -566,11 +570,13 @@ class DashboardPage extends StatelessWidget {
     required this.products,
     required this.movements,
     required this.onAdd,
+    required this.onLogout,
   });
 
   final List<Product> products;
   final List<InventoryMovement> movements;
   final VoidCallback onAdd;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -617,6 +623,11 @@ class DashboardPage extends StatelessWidget {
               const SnackBar(content: Text('Você tem 3 notificações novas')),
             ),
             icon: const Icon(Icons.notifications_none_rounded),
+          ),
+          IconButton(
+            onPressed: onLogout,
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Sair',
           ),
         ],
       ),

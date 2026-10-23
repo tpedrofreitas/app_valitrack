@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app_valitrack/valitrack_api.dart';
 
 void main() {
   runApp(const ValitrackApp());
@@ -10,7 +11,7 @@ class ValitrackApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ValiStock',
+      title: 'ValiTrack',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -35,9 +36,10 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _userController = TextEditingController(text: 'admin');
-  final _passwordController = TextEditingController(text: '123456');
   final _formKey = GlobalKey<FormState>();
+  final _userController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -47,6 +49,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _login() {
+    FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final user = _userController.text.trim();
@@ -67,130 +70,182 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  InputDecoration _decoration({
+    required String hint,
+    required IconData icon,
+    Widget? suffix,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(icon),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFD5DDE3)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF1E8E76), width: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F6F9),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Padding(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0F172A), Color(0xFF1E8E76)],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(28),
+                    child: Form(
+                      key: _formKey,
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF1E8E76,
-                              ).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Icon(
-                              Icons.lock_outline_rounded,
-                              size: 36,
-                              color: Color(0xFF1E8E76),
+                          Center(
+                            child: Container(
+                              width: 84,
+                              height: 84,
+                              decoration: BoxDecoration(
+                                color: const Color(
+                                  0xFF1E8E76,
+                                ).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: const Icon(
+                                Icons.inventory_2_rounded,
+                                size: 40,
+                                color: Color(0xFF1E8E76),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
+                          const Center(
+                            child: Text(
+                              'ValiTrack',
+                              style: TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF172A35),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Center(
+                            child: Text(
+                              'Acesse sua conta',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF60717B),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 28),
                           const Text(
-                            'ValiStock',
+                            'Usuário',
                             style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
                               color: Color(0xFF172A35),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _userController,
+                            textInputAction: TextInputAction.next,
+                            decoration: _decoration(
+                              hint: 'Digite seu usuário',
+                              icon: Icons.person_outline_rounded,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Informe o usuário';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          const Text(
+                            'Senha',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF172A35),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _login(),
+                            decoration: _decoration(
+                              hint: 'Digite sua senha',
+                              icon: Icons.lock_outline_rounded,
+                              suffix: IconButton(
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Informe a senha';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          FilledButton(
+                            onPressed: _login,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              backgroundColor: const Color(0xFF1E8E76),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Entrar',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 28),
-                    const Text(
-                      'Usuário',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF172A35),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _userController,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        hintText: 'Digite seu usuário',
-                        prefixIcon: Icon(Icons.person_outline_rounded),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Informe o usuário';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Senha',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF172A35),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _login(),
-                      decoration: const InputDecoration(
-                        hintText: 'Digite sua senha',
-                        prefixIcon: Icon(Icons.lock_outline_rounded),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Informe a senha';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 28),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _login,
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: const Color(0xFF1E8E76),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: const Text(
-                          'Entrar',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -201,51 +256,41 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-class Product {
-  Product({
-    required this.name,
-    required this.code,
-    required this.category,
-    required this.stock,
-    required this.minimum,
-    required this.validityDays,
+const _kGreen = Color(0xFF1E8E76);
+const _kDark = Color(0xFF172A35);
+const _kMuted = Color(0xFF60717B);
+const _kAmber = Color(0xFFF59E0B);
+const _kRed = Color(0xFFEF4444);
+
+/// Lote com saldo, já com os dias até o vencimento calculados.
+class LoteInfo {
+  LoteInfo({
+    required this.produtoNome,
+    required this.lote,
+    required this.data,
+    required this.dias,
   });
 
-  final String name;
-  final String code;
-  final String category;
-  int stock;
-  final int minimum;
-  final int validityDays;
+  final String produtoNome;
+  final LoteEstoque lote;
+  final DateTime? data;
+  final int? dias;
 
-  String get status {
-    if (stock <= minimum) {
-      return 'Baixo';
-    }
-    return 'Normal';
-  }
+  bool get vencido => dias != null && dias! < 0;
 }
 
-enum MovementType { entry, exit }
+String _errorMessage(Object error) {
+  if (error is ApiException) return error.message;
+  if (error is TypeError || error is FormatException) {
+    return 'A API retornou uma resposta inesperada.';
+  }
+  return 'Não foi possível conectar com a API.';
+}
 
-class InventoryMovement {
-  InventoryMovement({
-    required this.type,
-    required this.productName,
-    required this.quantity,
-    required this.reason,
-    required this.date,
-    this.supplier,
-    this.lot,
-  });
-
-  final MovementType type;
-  final String productName;
-  final int quantity;
-  final String reason;
-  final DateTime date;
-  final String? supplier;
-  final String? lot;
+String _formatDate(DateTime d) {
+  final day = d.day.toString().padLeft(2, '0');
+  final month = d.month.toString().padLeft(2, '0');
+  return '$day/$month/${d.year}';
 }
 
 class AppShell extends StatefulWidget {
@@ -256,86 +301,129 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
+  final _api = ValitrackApiService();
+
   int _selectedIndex = 0;
 
-  final List<Product> _products = [
-    Product(
-      name: 'Ração Premium',
-      code: 'RP-101',
-      category: 'Pet',
-      stock: 180,
-      minimum: 50,
-      validityDays: 36,
-    ),
-    Product(
-      name: 'Limpeza Multiuso',
-      code: 'LM-205',
-      category: 'Limpeza',
-      stock: 42,
-      minimum: 60,
-      validityDays: 12,
-    ),
-    Product(
-      name: 'Óleo Lubrificante',
-      code: 'OL-330',
-      category: 'Manutenção',
-      stock: 96,
-      minimum: 30,
-      validityDays: 58,
-    ),
-    Product(
-      name: 'Sacos de areia',
-      code: 'SA-080',
-      category: 'Construção',
-      stock: 300,
-      minimum: 90,
-      validityDays: 90,
-    ),
-  ];
+  bool _loading = true;
+  bool _lotesLoading = false;
+  String? _error;
 
-  final List<InventoryMovement> _movements = [
-    InventoryMovement(
-      type: MovementType.entry,
-      productName: 'Ração Premium',
-      quantity: 120,
-      reason: 'Compra de fornecedor',
-      date: DateTime(2026, 10, 14),
-      supplier: 'PetMarket Ltda',
-      lot: 'RP-204',
-    ),
-    InventoryMovement(
-      type: MovementType.exit,
-      productName: 'Ração Premium',
-      quantity: 28,
-      reason: 'Venda',
-      date: DateTime(2026, 10, 14),
-    ),
-    InventoryMovement(
-      type: MovementType.entry,
-      productName: 'Óleo Lubrificante',
-      quantity: 80,
-      reason: 'Reabastecimento',
-      date: DateTime(2026, 10, 12),
-      supplier: 'AutoMax',
-      lot: 'OL-112',
-    ),
-  ];
+  List<Produto> _produtos = [];
+  List<EstoqueResumo> _estoque = [];
+  List<Categoria> _categorias = [];
+  List<LoteInfo> _lotes = [];
 
-  List<Widget> get _pages => [
-    DashboardPage(
-      products: _products,
-      movements: _movements,
-      onAdd: _showQuickAddDialog,
-      onLogout: _showLogoutDialog,
-    ),
-    ProdutosPage(
-      products: _products,
-      onAdd: _showAddProductDialog,
-      onDelete: _deleteProduct,
-    ),
-    ValidadePage(products: _products),
-    EstoquePage(products: _products),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final results = await Future.wait<dynamic>([
+        _api.getProdutos(),
+        _api.getEstoqueGeral(),
+        _api.getCategorias(),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _produtos = results[0] as List<Produto>;
+        _estoque = results[1] as List<EstoqueResumo>;
+        _categorias = results[2] as List<Categoria>;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = _errorMessage(e);
+      });
+      return;
+    }
+
+    await _loadLotes();
+  }
+
+  /// A validade só existe por lote, então busca o detalhe de cada produto.
+  Future<void> _loadLotes() async {
+    if (!mounted) return;
+    setState(() => _lotesLoading = true);
+
+    final detalhes = <int, EstoqueDetalhado>{};
+    const batchSize = 4;
+
+    // Busca em pequenos grupos para não sobrecarregar o servidor local.
+    for (var i = 0; i < _produtos.length; i += batchSize) {
+      final batch = _produtos.skip(i).take(batchSize).toList();
+
+      await Future.wait(
+        batch.map((p) async {
+          try {
+            detalhes[p.id] = await _api.getEstoqueDetalhado(p.id);
+          } catch (_) {
+            // Ignora falha de um produto e segue com os demais.
+          }
+        }),
+      );
+
+      if (!mounted) return;
+      setState(() => _lotes = _buildLotes(detalhes));
+    }
+
+    if (!mounted) return;
+    setState(() => _lotesLoading = false);
+  }
+
+  List<LoteInfo> _buildLotes(Map<int, EstoqueDetalhado> detalhes) {
+    final now = DateTime.now();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final list = <LoteInfo>[];
+
+    for (final produto in _produtos) {
+      final detalhe = detalhes[produto.id];
+      if (detalhe == null) continue;
+
+      for (final lote in detalhe.lotes) {
+        if (lote.saldoDisponivel <= 0) continue;
+
+        final parsed = DateTime.tryParse(lote.dataValidade);
+        DateTime? data;
+        int? dias;
+        if (parsed != null) {
+          data = DateTime.utc(parsed.year, parsed.month, parsed.day);
+          dias = data.difference(today).inDays;
+        }
+
+        list.add(
+          LoteInfo(
+            produtoNome: produto.nome,
+            lote: lote,
+            data: data,
+            dias: dias,
+          ),
+        );
+      }
+    }
+
+    list.sort((a, b) {
+      final da = a.dias;
+      final db = b.dias;
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return da.compareTo(db);
+    });
+
+    return list;
+  }
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -348,149 +436,50 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  void _addProduct(Product product) {
-    setState(() {
-      _products.add(product);
-    });
-    _showSnack('Produto cadastrado com sucesso');
-  }
-
-  void _deleteProduct(String productName) {
-    final index = _products.indexWhere((p) => p.name == productName);
-    if (index == -1) return;
-
-    setState(() {
-      _products.removeAt(index);
-    });
-    _showSnack('Produto removido');
-  }
-
   Future<void> _showAddProductDialog() async {
-    final nameController = TextEditingController();
-    final codeController = TextEditingController();
-    final categoryController = TextEditingController();
-    final stockController = TextEditingController(text: '0');
-    final minimumController = TextEditingController(text: '0');
-    final validityController = TextEditingController(text: '30');
+    if (_categorias.isEmpty) {
+      _showSnack(
+        _loading
+            ? 'Aguarde o carregamento dos dados.'
+            : 'Cadastre uma categoria na API antes de adicionar produtos.',
+      );
+      return;
+    }
 
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Cadastrar produto'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome do produto',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: codeController,
-                  decoration: const InputDecoration(labelText: 'Código'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: categoryController,
-                  decoration: const InputDecoration(labelText: 'Categoria'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: stockController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Quantidade inicial',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: minimumController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Estoque mínimo',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: validityController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Prazo de validade (dias)',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final name = nameController.text.trim();
-                final code = codeController.text.trim();
-                final category = categoryController.text.trim();
-                final stock = int.tryParse(stockController.text) ?? 0;
-                final minimum = int.tryParse(minimumController.text) ?? 0;
-                final validityDays =
-                    int.tryParse(validityController.text) ?? 30;
-
-                if (name.isEmpty || code.isEmpty || category.isEmpty) {
-                  _showSnack('Preencha todos os campos obrigatórios');
-                  return;
-                }
-
-                _addProduct(
-                  Product(
-                    name: name,
-                    code: code,
-                    category: category,
-                    stock: stock,
-                    minimum: minimum,
-                    validityDays: validityDays,
-                  ),
-                );
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        );
-      },
+      barrierDismissible: false,
+      builder: (_) =>
+          _ProductFormDialog(categorias: _categorias, onSubmit: _createProduct),
     );
-
-    nameController.dispose();
-    codeController.dispose();
-    categoryController.dispose();
-    stockController.dispose();
-    minimumController.dispose();
-    validityController.dispose();
   }
 
-  Future<void> _showQuickAddDialog() async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Nova ação'),
-          content: const Text('Escolha a ação que deseja registrar.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                _showAddProductDialog();
-              },
-              child: const Text('Produto'),
-            ),
-          ],
-        );
-      },
-    );
+  /// Retorna a mensagem de erro, ou null se deu certo.
+  Future<String?> _createProduct(Map<String, dynamic> payload) async {
+    try {
+      await _api.createProduto(payload);
+    } catch (e) {
+      return _errorMessage(e);
+    }
+
+    if (mounted) {
+      _showSnack('Produto cadastrado com sucesso');
+      _loadAll();
+    }
+    return null;
+  }
+
+  Future<void> _deleteProduct(Produto produto) async {
+    try {
+      await _api.deleteProduto(produto.id);
+    } catch (e) {
+      if (mounted) _showSnack(_errorMessage(e));
+      return;
+    }
+
+    if (!mounted) return;
+    _showSnack('Produto removido');
+    await _loadAll();
   }
 
   Future<void> _showLogoutDialog() async {
@@ -525,9 +514,47 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    // Sem AppBar aqui: cada página já tem o seu próprio Scaffold/AppBar.
+    final estoqueById = {for (final e in _estoque) e.id: e};
+
+    final pages = <Widget>[
+      DashboardPage(
+        produtos: _produtos,
+        estoque: _estoque,
+        lotes: _lotes,
+        loading: _loading,
+        lotesLoading: _lotesLoading,
+        error: _error,
+        onRefresh: _loadAll,
+        onAdd: _showAddProductDialog,
+        onLogout: _showLogoutDialog,
+      ),
+      ProdutosPage(
+        produtos: _produtos,
+        estoqueById: estoqueById,
+        loading: _loading,
+        error: _error,
+        onRefresh: _loadAll,
+        onAdd: _showAddProductDialog,
+        onDelete: _deleteProduct,
+      ),
+      ValidadePage(
+        lotes: _lotes,
+        hasProducts: _produtos.isNotEmpty,
+        loading: _loading,
+        lotesLoading: _lotesLoading,
+        error: _error,
+        onRefresh: _loadAll,
+      ),
+      EstoquePage(
+        estoque: _estoque,
+        loading: _loading,
+        error: _error,
+        onRefresh: _loadAll,
+      ),
+    ];
+
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _pages),
+      body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
@@ -536,7 +563,7 @@ class _AppShellState extends State<AppShell> {
           });
         },
         backgroundColor: Colors.white,
-        indicatorColor: const Color(0xFF1E8E76).withValues(alpha: 0.12),
+        indicatorColor: _kGreen.withValues(alpha: 0.12),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
@@ -564,65 +591,282 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Formulário de cadastro de produto
+// ---------------------------------------------------------------------------
+
+class _ProductFormDialog extends StatefulWidget {
+  const _ProductFormDialog({required this.categorias, required this.onSubmit});
+
+  final List<Categoria> categorias;
+  final Future<String?> Function(Map<String, dynamic> payload) onSubmit;
+
+  @override
+  State<_ProductFormDialog> createState() => _ProductFormDialogState();
+}
+
+class _ProductFormDialogState extends State<_ProductFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nomeController = TextEditingController();
+  final _codigoController = TextEditingController();
+  final _fabricanteController = TextEditingController();
+  final _unidadeController = TextEditingController(text: 'UND');
+  final _minimoController = TextEditingController(text: '0');
+
+  int? _categoriaId;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.categorias.isNotEmpty) {
+      _categoriaId = widget.categorias.first.id;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nomeController.dispose();
+    _codigoController.dispose();
+    _fabricanteController.dispose();
+    _unidadeController.dispose();
+    _minimoController.dispose();
+    super.dispose();
+  }
+
+  String? _required(String? value, String message) {
+    if (value == null || value.trim().isEmpty) return message;
+    return null;
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    final payload = <String, dynamic>{
+      'nome': _nomeController.text.trim(),
+      'codigo_barras': _codigoController.text.trim(),
+      'fabricante': _fabricanteController.text.trim(),
+      'unidade_medida': _unidadeController.text.trim(),
+      'categoria_id': _categoriaId,
+      'estoque_minimo': int.tryParse(_minimoController.text.trim()) ?? 0,
+    };
+
+    final error = await widget.onSubmit(payload);
+    if (!mounted) return;
+
+    if (error == null) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _saving = false;
+        _error = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Cadastrar produto'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nomeController,
+                maxLength: 150,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Nome do produto',
+                  counterText: '',
+                ),
+                validator: (v) => _required(v, 'Informe o nome'),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _codigoController,
+                maxLength: 50,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Código de barras',
+                  counterText: '',
+                ),
+                validator: (v) => _required(v, 'Informe o código de barras'),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _fabricanteController,
+                maxLength: 100,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Fabricante',
+                  counterText: '',
+                ),
+                validator: (v) => _required(v, 'Informe o fabricante'),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _unidadeController,
+                maxLength: 20,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Unidade de medida',
+                  counterText: '',
+                ),
+                validator: (v) => _required(v, 'Informe a unidade'),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                initialValue: _categoriaId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Categoria'),
+                items: widget.categorias
+                    .map(
+                      (c) => DropdownMenuItem<int>(
+                        value: c.id,
+                        child: Text(c.nome, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() => _categoriaId = value),
+                validator: (v) => v == null ? 'Selecione a categoria' : null,
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _minimoController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Estoque mínimo'),
+                validator: (v) {
+                  final text = v?.trim() ?? '';
+                  if (text.isEmpty) return null;
+                  final n = int.tryParse(text);
+                  if (n == null || n < 0) return 'Informe um número válido';
+                  return null;
+                },
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: _kRed, fontSize: 13),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Salvar'),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Páginas
+// ---------------------------------------------------------------------------
+
 class DashboardPage extends StatelessWidget {
   const DashboardPage({
     super.key,
-    required this.products,
-    required this.movements,
+    required this.produtos,
+    required this.estoque,
+    required this.lotes,
+    required this.loading,
+    required this.lotesLoading,
+    required this.error,
+    required this.onRefresh,
     required this.onAdd,
     required this.onLogout,
   });
 
-  final List<Product> products;
-  final List<InventoryMovement> movements;
+  final List<Produto> produtos;
+  final List<EstoqueResumo> estoque;
+  final List<LoteInfo> lotes;
+  final bool loading;
+  final bool lotesLoading;
+  final String? error;
+  final Future<void> Function() onRefresh;
   final VoidCallback onAdd;
   final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
-    final totalProducts = products.length;
-    final alerts = products.where((p) => p.stock <= p.minimum).length;
-    final expiredProducts = products.where((p) => p.stock == 0).length;
-    final closestValidity = products.isEmpty
-        ? 0
-        : products.map((p) => p.validityDays).reduce((a, b) => a < b ? a : b);
+    final alerts = estoque.where((e) => e.abaixoDoMinimo).length;
+    final expired = lotes.where((l) => l.vencido).length;
+    final upcoming = lotes
+        .where((l) => l.dias != null && l.dias! >= 0)
+        .map((l) => l.dias!)
+        .toList();
+    final closest = upcoming.isEmpty
+        ? null
+        : upcoming.reduce((a, b) => a < b ? a : b);
 
     final metrics = [
       _MetricCard(
         title: 'Produtos',
-        value: '$totalProducts',
+        value: '${produtos.length}',
         subtitle: 'ativos no catálogo',
-        color: const Color(0xFF1E8E76),
+        color: _kGreen,
       ),
       _MetricCard(
         title: 'Vencidos',
-        value: '$expiredProducts',
-        subtitle: 'itens sem estoque',
-        color: const Color(0xFFEF4444),
+        value: lotesLoading ? '...' : '$expired',
+        subtitle: 'lotes vencidos',
+        color: _kRed,
       ),
       _MetricCard(
         title: 'Validade',
-        value: '$closestValidity dias',
+        value: lotesLoading
+            ? '...'
+            : closest == null
+            ? '—'
+            : '$closest dias',
         subtitle: 'prazo mais próximo',
         color: const Color(0xFF3B82F6),
       ),
       _MetricCard(
         title: 'Alerta',
         value: '$alerts',
-        subtitle: 'itens em atenção',
-        color: const Color(0xFFF59E0B),
+        subtitle: 'abaixo do mínimo',
+        color: _kAmber,
       ),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ValiStock'),
+        title: const Text('ValiTrack'),
         actions: [
           IconButton(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Você tem 3 notificações novas')),
-            ),
-            icon: const Icon(Icons.notifications_none_rounded),
+            onPressed: loading ? null : () => onRefresh(),
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Atualizar',
           ),
           IconButton(
             onPressed: onLogout,
@@ -632,14 +876,17 @@ class DashboardPage extends StatelessWidget {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
+        child: _PageBody(
+          loading: loading,
+          error: error,
+          hasData: produtos.isNotEmpty,
+          onRefresh: onRefresh,
           children: [
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF123C3A), Color(0xFF1E8E76)],
+                  colors: [Color(0xFF123C3A), _kGreen],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -680,13 +927,11 @@ class DashboardPage extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       _Pill(
-                        label: 'Estoque saudável',
-                        onTap: () => _showInfo(context, 'Estoque saudável'),
+                        label: alerts == 0
+                            ? 'Estoque saudável'
+                            : '$alerts item(ns) abaixo do mínimo',
                       ),
-                      _Pill(
-                        label: 'Alertas ativos',
-                        onTap: () => _showInfo(context, 'Alertas ativos'),
-                      ),
+                      _Pill(label: '${lotes.length} lote(s) com saldo'),
                     ],
                   ),
                 ],
@@ -698,7 +943,7 @@ class DashboardPage extends StatelessWidget {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF172A35),
+                color: _kDark,
               ),
             ),
             const SizedBox(height: 14),
@@ -708,71 +953,116 @@ class DashboardPage extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
+              childAspectRatio: 0.9,
               children: metrics,
             ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         onPressed: onAdd,
-        backgroundColor: const Color(0xFF1E8E76),
+        backgroundColor: _kGreen,
         child: const Icon(Icons.add_rounded),
       ),
     );
-  }
-
-  void _showInfo(BuildContext context, String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 }
 
 class ProdutosPage extends StatelessWidget {
   const ProdutosPage({
     super.key,
-    required this.products,
+    required this.produtos,
+    required this.estoqueById,
+    required this.loading,
+    required this.error,
+    required this.onRefresh,
     required this.onAdd,
     required this.onDelete,
   });
 
-  final List<Product> products;
+  final List<Produto> produtos;
+  final Map<int, EstoqueResumo> estoqueById;
+  final bool loading;
+  final String? error;
+  final Future<void> Function() onRefresh;
   final VoidCallback onAdd;
-  final ValueChanged<String> onDelete;
+  final Future<void> Function(Produto produto) onDelete;
+
+  Future<void> _confirmDelete(BuildContext context, Produto produto) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Excluir produto'),
+          content: Text('Deseja excluir "${produto.nome}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _kRed),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Excluir'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await onDelete(produto);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Produtos')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: _PageBody(
+        loading: loading,
+        error: error,
+        hasData: produtos.isNotEmpty,
+        onRefresh: onRefresh,
         children: [
           const Text(
             'Catálogo de produtos',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF172A35),
+              color: _kDark,
             ),
           ),
           const SizedBox(height: 16),
-          ...products.map(
-            (product) => _ProductCard(
-              name: product.name,
-              code: product.code,
-              category: product.category,
-              stock: product.stock,
-              minimum: product.minimum,
-              status: product.status,
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Produto ${product.name} selecionado')),
-              ),
-              onDelete: () => onDelete(product.name),
-            ),
-          ),
+          if (produtos.isEmpty)
+            const _EmptyMessage('Nenhum produto cadastrado.')
+          else
+            ...produtos.map((produto) {
+              final resumo = estoqueById[produto.id];
+              final categoria =
+                  produto.categoria?.nome ?? resumo?.categoria ?? '';
+              final below = resumo?.abaixoDoMinimo ?? false;
+
+              return _ProductCard(
+                name: produto.nome,
+                subtitle: categoria.isEmpty
+                    ? produto.codigoBarras
+                    : '$categoria • ${produto.codigoBarras}',
+                manufacturer:
+                    '${produto.fabricante} • ${produto.unidadeMedida}',
+                stock: resumo?.estoqueDisponivel ?? 0,
+                minimum: produto.estoqueMinimo,
+                status: below ? 'Baixo' : 'Normal',
+                onDelete: () => _confirmDelete(context, produto),
+              );
+            }),
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         onPressed: onAdd,
-        backgroundColor: const Color(0xFF1E8E76),
+        backgroundColor: _kGreen,
         child: const Icon(Icons.add_rounded),
       ),
     );
@@ -780,37 +1070,53 @@ class ProdutosPage extends StatelessWidget {
 }
 
 class EstoquePage extends StatelessWidget {
-  const EstoquePage({super.key, required this.products});
+  const EstoquePage({
+    super.key,
+    required this.estoque,
+    required this.loading,
+    required this.error,
+    required this.onRefresh,
+  });
 
-  final List<Product> products;
+  final List<EstoqueResumo> estoque;
+  final bool loading;
+  final String? error;
+  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Estoque')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: _PageBody(
+        loading: loading,
+        error: error,
+        hasData: estoque.isNotEmpty,
+        onRefresh: onRefresh,
         children: [
           const Text(
             'Controle de estoque e alertas',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF172A35),
+              color: _kDark,
             ),
           ),
           const SizedBox(height: 16),
-          ...products.map(
-            (product) => _StockCard(
-              name: product.name,
-              available: product.stock,
-              minimum: product.minimum,
-              status: product.status,
-              validity: product.stock <= product.minimum
-                  ? 'Atenção: estoque baixo'
-                  : 'Disponível',
+          if (estoque.isEmpty)
+            const _EmptyMessage('Nenhum item em estoque.')
+          else
+            ...estoque.map(
+              (item) => _StockCard(
+                name: item.nome,
+                category: item.categoria,
+                available: item.estoqueDisponivel,
+                minimum: item.estoqueMinimo,
+                status: item.abaixoDoMinimo ? 'Baixo' : 'Normal',
+                note: item.abaixoDoMinimo
+                    ? 'Atenção: estoque abaixo do mínimo'
+                    : 'Disponível',
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -818,31 +1124,160 @@ class EstoquePage extends StatelessWidget {
 }
 
 class ValidadePage extends StatelessWidget {
-  const ValidadePage({super.key, required this.products});
+  const ValidadePage({
+    super.key,
+    required this.lotes,
+    required this.hasProducts,
+    required this.loading,
+    required this.lotesLoading,
+    required this.error,
+    required this.onRefresh,
+  });
 
-  final List<Product> products;
+  final List<LoteInfo> lotes;
+  final bool hasProducts;
+  final bool loading;
+  final bool lotesLoading;
+  final String? error;
+  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Validade')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: _PageBody(
+        loading: loading,
+        error: error,
+        hasData: hasProducts,
+        onRefresh: onRefresh,
         children: [
           const Text(
             'Prazo de validade',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF172A35),
+              color: _kDark,
             ),
           ),
           const SizedBox(height: 16),
-          ...products.map(
-            (product) => _ValidadeCard(
-              name: product.name,
-              days: product.validityDays,
-              stock: product.stock,
+          if (lotesLoading && lotes.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (lotes.isEmpty)
+            const _EmptyMessage('Nenhum lote com saldo disponível.')
+          else
+            ...lotes.map((info) => _ValidadeCard(info: info)),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Componentes de apoio
+// ---------------------------------------------------------------------------
+
+/// Corpo padrão das páginas: carregando, erro, ou lista com puxar-para-atualizar.
+class _PageBody extends StatelessWidget {
+  const _PageBody({
+    required this.loading,
+    required this.error,
+    required this.hasData,
+    required this.onRefresh,
+    required this.children,
+  });
+
+  final bool loading;
+  final String? error;
+  final bool hasData;
+  final Future<void> Function() onRefresh;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = error;
+
+    if (loading && !hasData) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (message != null && !hasData) {
+      return _ErrorView(message: message, onRetry: () => onRefresh());
+    }
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        children: [
+          if (message != null) _ErrorBanner(message: message),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 56, color: _kMuted),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15, color: _kDark),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onRetry,
+              style: FilledButton.styleFrom(backgroundColor: _kGreen),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _kRed.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: _kRed, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(fontSize: 13, color: _kRed),
             ),
           ),
         ],
@@ -851,30 +1286,41 @@ class ValidadePage extends StatelessWidget {
   }
 }
 
-class _Pill extends StatelessWidget {
-  final String label;
-  final VoidCallback? onTap;
+class _EmptyMessage extends StatelessWidget {
+  const _EmptyMessage(this.text);
 
-  const _Pill({required this.label, this.onTap});
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap ?? () {},
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: Text(text, style: const TextStyle(fontSize: 14, color: _kMuted)),
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  final String label;
+
+  const _Pill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -896,64 +1342,49 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$title: $value'))),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.trending_up_rounded, color: color),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.trending_up_rounded, color: color),
+          const SizedBox(height: 18),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: _kDark,
               ),
-              const SizedBox(height: 18),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF172A35),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF253C49),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF60717B)),
-              ),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF253C49),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(subtitle, style: const TextStyle(fontSize: 12, color: _kMuted)),
+        ],
       ),
     );
   }
@@ -961,119 +1392,105 @@ class _MetricCard extends StatelessWidget {
 
 class _ProductCard extends StatelessWidget {
   final String name;
-  final String code;
-  final String category;
+  final String subtitle;
+  final String manufacturer;
   final int stock;
   final int minimum;
   final String status;
-  final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _ProductCard({
     required this.name,
-    required this.code,
-    required this.category,
+    required this.subtitle,
+    required this.manufacturer,
     required this.stock,
     required this.minimum,
     required this.status,
-    required this.onTap,
     required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = status == 'Baixo'
-        ? const Color(0xFFF59E0B)
-        : const Color(0xFF1E8E76);
+    final color = status == 'Baixo' ? _kAmber : _kGreen;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.inventory_2_rounded, color: color),
           ),
-          child: Row(
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _kDark,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  manufacturer,
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Disponível: $stock • Mínimo: $minimum',
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
+                ),
+              ],
+            ),
+          ),
+          Column(
             children: [
               Container(
-                width: 52,
-                height: 52,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(999),
                 ),
-                child: Icon(Icons.inventory_2_rounded, color: color),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF172A35),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$category • $code',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF60717B),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Disponível: $stock • Mínimo: $minimum',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF60717B),
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
                 ),
               ),
-              Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      status,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  IconButton(
-                    onPressed: onDelete,
-                    icon: const Icon(
-                      Icons.delete_outline_rounded,
-                      color: Color(0xFFEF4444),
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 8),
+              IconButton(
+                onPressed: onDelete,
+                tooltip: 'Excluir',
+                icon: const Icon(Icons.delete_outline_rounded, color: _kRed),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1081,24 +1498,24 @@ class _ProductCard extends StatelessWidget {
 
 class _StockCard extends StatelessWidget {
   final String name;
+  final String category;
   final int available;
   final int minimum;
   final String status;
-  final String validity;
+  final String note;
 
   const _StockCard({
     required this.name,
+    required this.category,
     required this.available,
     required this.minimum,
     required this.status,
-    required this.validity,
+    required this.note,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = status == 'Baixo'
-        ? const Color(0xFFF59E0B)
-        : const Color(0xFF1E8E76);
+    final color = status == 'Baixo' ? _kAmber : _kGreen;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1128,24 +1545,25 @@ class _StockCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF172A35),
+                    color: _kDark,
                   ),
                 ),
+                if (category.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    category,
+                    style: const TextStyle(fontSize: 12, color: _kMuted),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   'Disponível: $available • Mínimo: $minimum',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF60717B),
-                  ),
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  validity,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF60717B),
-                  ),
+                  note,
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
                 ),
               ],
             ),
@@ -1172,23 +1590,36 @@ class _StockCard extends StatelessWidget {
 }
 
 class _ValidadeCard extends StatelessWidget {
-  final String name;
-  final int days;
-  final int stock;
+  final LoteInfo info;
 
-  const _ValidadeCard({
-    required this.name,
-    required this.days,
-    required this.stock,
-  });
+  const _ValidadeCard({required this.info});
 
   @override
   Widget build(BuildContext context) {
-    final color = days <= 15
-        ? const Color(0xFFEF4444)
-        : days <= 45
-        ? const Color(0xFFF59E0B)
-        : const Color(0xFF1E8E76);
+    final dias = info.dias;
+
+    final color = dias == null
+        ? _kMuted
+        : dias <= 15
+        ? _kRed
+        : dias <= 45
+        ? _kAmber
+        : _kGreen;
+
+    final chip = dias == null
+        ? (info.lote.textoValidade.isEmpty ? '—' : info.lote.textoValidade)
+        : dias < 0
+        ? 'Vencido'
+        : dias == 0
+        ? 'Vence hoje'
+        : '$dias dias';
+
+    final data = info.data;
+    final dateText = data != null
+        ? _formatDate(data)
+        : info.lote.dataValidade.isEmpty
+        ? '—'
+        : info.lote.dataValidade;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1214,20 +1645,22 @@ class _ValidadeCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  info.produtoNome,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF172A35),
+                    color: _kDark,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Estoque: $stock unidades',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF60717B),
-                  ),
+                  'Lote ${info.lote.numeroLote} • ${info.lote.saldoDisponivel} un.',
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Validade: $dateText',
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
                 ),
               ],
             ),
@@ -1239,7 +1672,7 @@ class _ValidadeCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
-              '$days dias',
+              chip,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,

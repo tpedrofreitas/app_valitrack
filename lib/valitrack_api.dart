@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000/api',
+    defaultValue: 'http://10.0.2.2:8000/api/v1',
   );
 
   static String buildUrl(String endpoint) {

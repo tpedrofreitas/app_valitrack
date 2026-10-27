@@ -701,6 +701,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   final _fabricacaoController = TextEditingController();
   final _validadeController = TextEditingController();
 
+  // Categoria e fornecedor não aparecem na tela: o app usa o primeiro da lista.
   int? _categoriaId;
   int? _fornecedorId;
   DateTime? _fabricacao;
@@ -876,24 +877,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 validator: (v) => _required(v, 'Informe a unidade'),
               ),
               const SizedBox(height: 8),
-              DropdownButtonFormField<int>(
-                initialValue: _categoriaId,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Categoria'),
-                items: widget.categorias
-                    .map(
-                      (c) => DropdownMenuItem<int>(
-                        value: c.id,
-                        child: Text(c.nome, overflow: TextOverflow.ellipsis),
-                      ),
-                    )
-                    .toList(),
-                onChanged: _saving
-                    ? null
-                    : (value) => setState(() => _categoriaId = value),
-                validator: (v) => v == null ? 'Selecione a categoria' : null,
-              ),
-              const SizedBox(height: 8),
               TextFormField(
                 controller: _minimoController,
                 keyboardType: TextInputType.number,
@@ -989,24 +972,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<int>(
-                  initialValue: _fornecedorId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Fornecedor'),
-                  items: widget.fornecedores
-                      .map(
-                        (f) => DropdownMenuItem<int>(
-                          value: f.id,
-                          child: Text(f.nome, overflow: TextOverflow.ellipsis),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: _saving
-                      ? null
-                      : (value) => setState(() => _fornecedorId = value),
-                  validator: (v) => v == null ? 'Selecione o fornecedor' : null,
                 ),
               ],
               if (_error != null) ...[

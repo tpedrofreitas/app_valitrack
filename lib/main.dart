@@ -312,6 +312,7 @@ class _AppShellState extends State<AppShell> {
   List<Produto> _produtos = [];
   List<EstoqueResumo> _estoque = [];
   List<Categoria> _categorias = [];
+  List<Fornecedor> _fornecedores = [];
   List<LoteInfo> _lotes = [];
 
   @override
@@ -331,6 +332,7 @@ class _AppShellState extends State<AppShell> {
         _api.getProdutos(),
         _api.getEstoqueGeral(),
         _api.getCategorias(),
+        _api.getFornecedores().catchError((_) => <Fornecedor>[]),
       ]);
 
       if (!mounted) return;
@@ -338,6 +340,7 @@ class _AppShellState extends State<AppShell> {
         _produtos = results[0] as List<Produto>;
         _estoque = results[1] as List<EstoqueResumo>;
         _categorias = results[2] as List<Categoria>;
+        _fornecedores = results[3] as List<Fornecedor>;
         _loading = false;
       });
     } catch (e) {
@@ -425,12 +428,14 @@ class _AppShellState extends State<AppShell> {
     return list;
   }
 
-  void _showSnack(String message) {
+  void _showSnack(String message, {SnackBarAction? action}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
+        duration: Duration(seconds: action == null ? 4 : 8),
+        action: action,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
@@ -449,21 +454,89 @@ class _AppShellState extends State<AppShell> {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (_) =>
-          _ProductFormDialog(categorias: _categorias, onSubmit: _createProduct),
+      builder: (_) => _ProductFormDialog(
+        categorias: _categorias,
+        fornecedores: _fornecedores,
+        onSubmit: _createProduct,
+      ),
+    );
+  }
+
+  /// Cria o produto e, se informado, o lote com a validade.
+  /// Retorna a mensagem de erro, ou null se o produto foi criado.
+  Future<String?> _createProduct(
+    Map<String, dynamic> payload,
+    Map<String, dynamic>? lote,
+  ) async {
+    final Produto produto;
+    try {
+      produto = await _api.createProduto(payload);
+    } catch (e) {
+      return _errorMessage(e);
+    }
+
+    String? loteError;
+    if (lote != null) {
+      try {
+        await _api.createLote(produto.id, lote);
+      } catch (e) {
+        loteError = _errorMessage(e);
+      }
+    }
+
+    if (mounted) {
+      final addLoteAction = SnackBarAction(
+        label: 'Adicionar lote',
+        onPressed: () {
+          if (mounted) _showAddLoteDialog(produto);
+        },
+      );
+
+      if (lote == null) {
+        _showSnack('Produto cadastrado com sucesso', action: addLoteAction);
+      } else if (loteError == null) {
+        _showSnack('Produto e lote cadastrados com sucesso');
+      } else {
+        _showSnack(
+          'Produto cadastrado, mas o lote não foi salvo: $loteError',
+          action: addLoteAction,
+        );
+      }
+      _loadAll();
+    }
+    return null;
+  }
+
+  Future<void> _showAddLoteDialog(Produto produto) async {
+    if (_fornecedores.isEmpty) {
+      _showSnack('Cadastre um fornecedor na API antes de adicionar lotes.');
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _LoteFormDialog(
+        produto: produto,
+        fornecedores: _fornecedores,
+        onSubmit: (payload) => _createLote(produto, payload),
+      ),
     );
   }
 
   /// Retorna a mensagem de erro, ou null se deu certo.
-  Future<String?> _createProduct(Map<String, dynamic> payload) async {
+  Future<String?> _createLote(
+    Produto produto,
+    Map<String, dynamic> payload,
+  ) async {
     try {
-      await _api.createProduto(payload);
+      await _api.createLote(produto.id, payload);
     } catch (e) {
       return _errorMessage(e);
     }
 
     if (mounted) {
-      _showSnack('Produto cadastrado com sucesso');
+      _showSnack('Lote cadastrado com sucesso');
       _loadAll();
     }
     return null;
@@ -536,6 +609,7 @@ class _AppShellState extends State<AppShell> {
         onRefresh: _loadAll,
         onAdd: _showAddProductDialog,
         onDelete: _deleteProduct,
+        onAddLote: _showAddLoteDialog,
       ),
       ValidadePage(
         lotes: _lotes,
@@ -590,16 +664,25 @@ class _AppShellState extends State<AppShell> {
     );
   }
 }
-
+//parte 2
 // ---------------------------------------------------------------------------
-// Formulário de cadastro de produto
+// Formulário de cadastro de produto (com lote e validade opcionais)
 // ---------------------------------------------------------------------------
 
 class _ProductFormDialog extends StatefulWidget {
-  const _ProductFormDialog({required this.categorias, required this.onSubmit});
+  const _ProductFormDialog({
+    required this.categorias,
+    required this.fornecedores,
+    required this.onSubmit,
+  });
 
   final List<Categoria> categorias;
-  final Future<String?> Function(Map<String, dynamic> payload) onSubmit;
+  final List<Fornecedor> fornecedores;
+  final Future<String?> Function(
+    Map<String, dynamic> produto,
+    Map<String, dynamic>? lote,
+  )
+  onSubmit;
 
   @override
   State<_ProductFormDialog> createState() => _ProductFormDialogState();
@@ -613,9 +696,20 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   final _unidadeController = TextEditingController(text: 'UND');
   final _minimoController = TextEditingController(text: '0');
 
+  final _loteController = TextEditingController();
+  final _quantidadeController = TextEditingController();
+  final _fabricacaoController = TextEditingController();
+  final _validadeController = TextEditingController();
+
   int? _categoriaId;
+  int? _fornecedorId;
+  DateTime? _fabricacao;
+  DateTime? _validade;
+  bool _addLote = false;
   bool _saving = false;
   String? _error;
+
+  bool get _canAddLote => widget.fornecedores.isNotEmpty;
 
   @override
   void initState() {
@@ -623,6 +717,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     if (widget.categorias.isNotEmpty) {
       _categoriaId = widget.categorias.first.id;
     }
+    if (widget.fornecedores.isNotEmpty) {
+      _fornecedorId = widget.fornecedores.first.id;
+    }
+    _addLote = _canAddLote;
   }
 
   @override
@@ -632,6 +730,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     _fabricanteController.dispose();
     _unidadeController.dispose();
     _minimoController.dispose();
+    _loteController.dispose();
+    _quantidadeController.dispose();
+    _fabricacaoController.dispose();
+    _validadeController.dispose();
     super.dispose();
   }
 
@@ -640,15 +742,64 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     return null;
   }
 
+  String _iso(DateTime d) {
+    final month = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$month-$day';
+  }
+
+  Future<void> _pickFabricacao() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fabricacao ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    setState(() {
+      _fabricacao = picked;
+      _fabricacaoController.text = _formatDate(picked);
+    });
+  }
+
+  Future<void> _pickValidade() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _validade ?? _fabricacao ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    setState(() {
+      _validade = picked;
+      _validadeController.text = _formatDate(picked);
+    });
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    Map<String, dynamic>? lote;
+    if (_addLote) {
+      final fabricacao = _fabricacao;
+      final validade = _validade;
+      if (fabricacao == null || validade == null) return;
+
+      lote = <String, dynamic>{
+        'numero_lote': _loteController.text.trim(),
+        'quantidade': int.parse(_quantidadeController.text.trim()),
+        'data_fabricacao': _iso(fabricacao),
+        'data_validade': _iso(validade),
+        'fornecedor_id': _fornecedorId,
+      };
+    }
 
     setState(() {
       _saving = true;
       _error = null;
     });
 
-    final payload = <String, dynamic>{
+    final produto = <String, dynamic>{
       'nome': _nomeController.text.trim(),
       'codigo_barras': _codigoController.text.trim(),
       'fabricante': _fabricanteController.text.trim(),
@@ -657,7 +808,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       'estoque_minimo': int.tryParse(_minimoController.text.trim()) ?? 0,
     };
 
-    final error = await widget.onSubmit(payload);
+    final error = await widget.onSubmit(produto, lote);
     if (!mounted) return;
 
     if (error == null) {
@@ -679,6 +830,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextFormField(
                 controller: _nomeController,
@@ -754,6 +906,109 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   return null;
                 },
               ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              if (_canAddLote)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Cadastrar lote com validade',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: const Text(
+                    'Entrada de estoque deste produto',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  value: _addLote,
+                  onChanged: _saving
+                      ? null
+                      : (v) => setState(() => _addLote = v),
+                )
+              else
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'Cadastre um fornecedor na API para informar a validade.',
+                    style: TextStyle(fontSize: 12, color: _kMuted),
+                  ),
+                ),
+              if (_addLote) ...[
+                TextFormField(
+                  controller: _loteController,
+                  maxLength: 50,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Número do lote',
+                    counterText: '',
+                  ),
+                  validator: (v) => _required(v, 'Informe o número do lote'),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _quantidadeController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantidade inicial',
+                  ),
+                  validator: (v) {
+                    final n = int.tryParse(v?.trim() ?? '');
+                    if (n == null || n < 1) {
+                      return 'Informe uma quantidade válida';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _fabricacaoController,
+                  readOnly: true,
+                  onTap: _pickFabricacao,
+                  decoration: const InputDecoration(
+                    labelText: 'Data de fabricação',
+                    suffixIcon: Icon(Icons.calendar_today_rounded, size: 18),
+                  ),
+                  validator: (_) => _fabricacao == null
+                      ? 'Informe a data de fabricação'
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _validadeController,
+                  readOnly: true,
+                  onTap: _pickValidade,
+                  decoration: const InputDecoration(
+                    labelText: 'Data de validade',
+                    suffixIcon: Icon(Icons.calendar_today_rounded, size: 18),
+                  ),
+                  validator: (_) {
+                    final validade = _validade;
+                    final fabricacao = _fabricacao;
+                    if (validade == null) return 'Informe a data de validade';
+                    if (fabricacao != null && validade.isBefore(fabricacao)) {
+                      return 'Anterior à data de fabricação';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  initialValue: _fornecedorId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Fornecedor'),
+                  items: widget.fornecedores
+                      .map(
+                        (f) => DropdownMenuItem<int>(
+                          value: f.id,
+                          child: Text(f.nome, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _fornecedorId = value),
+                  validator: (v) => v == null ? 'Selecione o fornecedor' : null,
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 Text(
@@ -788,6 +1043,249 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Formulário de cadastro de lote (entrada de estoque com validade)
+// ---------------------------------------------------------------------------
+
+class _LoteFormDialog extends StatefulWidget {
+  const _LoteFormDialog({
+    required this.produto,
+    required this.fornecedores,
+    required this.onSubmit,
+  });
+
+  final Produto produto;
+  final List<Fornecedor> fornecedores;
+  final Future<String?> Function(Map<String, dynamic> payload) onSubmit;
+
+  @override
+  State<_LoteFormDialog> createState() => _LoteFormDialogState();
+}
+
+class _LoteFormDialogState extends State<_LoteFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _loteController = TextEditingController();
+  final _quantidadeController = TextEditingController();
+  final _fabricacaoController = TextEditingController();
+  final _validadeController = TextEditingController();
+
+  DateTime? _fabricacao;
+  DateTime? _validade;
+  int? _fornecedorId;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.fornecedores.isNotEmpty) {
+      _fornecedorId = widget.fornecedores.first.id;
+    }
+  }
+
+  @override
+  void dispose() {
+    _loteController.dispose();
+    _quantidadeController.dispose();
+    _fabricacaoController.dispose();
+    _validadeController.dispose();
+    super.dispose();
+  }
+
+  String _iso(DateTime d) {
+    final month = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$month-$day';
+  }
+
+  Future<void> _pickFabricacao() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fabricacao ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    setState(() {
+      _fabricacao = picked;
+      _fabricacaoController.text = _formatDate(picked);
+    });
+  }
+
+  Future<void> _pickValidade() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _validade ?? _fabricacao ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    setState(() {
+      _validade = picked;
+      _validadeController.text = _formatDate(picked);
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final fabricacao = _fabricacao;
+    final validade = _validade;
+    if (fabricacao == null || validade == null) return;
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    final payload = <String, dynamic>{
+      'numero_lote': _loteController.text.trim(),
+      'quantidade': int.parse(_quantidadeController.text.trim()),
+      'data_fabricacao': _iso(fabricacao),
+      'data_validade': _iso(validade),
+      'fornecedor_id': _fornecedorId,
+    };
+
+    final error = await widget.onSubmit(payload);
+    if (!mounted) return;
+
+    if (error == null) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _saving = false;
+        _error = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Adicionar lote'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.produto.nome,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _kDark,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _loteController,
+                maxLength: 50,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Número do lote',
+                  counterText: '',
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Informe o número do lote'
+                    : null,
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _quantidadeController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Quantidade'),
+                validator: (v) {
+                  final n = int.tryParse(v?.trim() ?? '');
+                  if (n == null || n < 1)
+                    return 'Informe uma quantidade válida';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _fabricacaoController,
+                readOnly: true,
+                onTap: _pickFabricacao,
+                decoration: const InputDecoration(
+                  labelText: 'Data de fabricação',
+                  suffixIcon: Icon(Icons.calendar_today_rounded, size: 18),
+                ),
+                validator: (_) =>
+                    _fabricacao == null ? 'Informe a data de fabricação' : null,
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _validadeController,
+                readOnly: true,
+                onTap: _pickValidade,
+                decoration: const InputDecoration(
+                  labelText: 'Data de validade',
+                  suffixIcon: Icon(Icons.calendar_today_rounded, size: 18),
+                ),
+                validator: (_) {
+                  final validade = _validade;
+                  final fabricacao = _fabricacao;
+                  if (validade == null) return 'Informe a data de validade';
+                  if (fabricacao != null && validade.isBefore(fabricacao)) {
+                    return 'Anterior à data de fabricação';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                initialValue: _fornecedorId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Fornecedor'),
+                items: widget.fornecedores
+                    .map(
+                      (f) => DropdownMenuItem<int>(
+                        value: f.id,
+                        child: Text(f.nome, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() => _fornecedorId = value),
+                validator: (v) => v == null ? 'Selecione o fornecedor' : null,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: _kRed, fontSize: 13),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Salvar'),
+        ),
+      ],
+    );
+  }
+}
+//parte 3
 // ---------------------------------------------------------------------------
 // Páginas
 // ---------------------------------------------------------------------------
@@ -979,6 +1477,7 @@ class ProdutosPage extends StatelessWidget {
     required this.onRefresh,
     required this.onAdd,
     required this.onDelete,
+    required this.onAddLote,
   });
 
   final List<Produto> produtos;
@@ -988,6 +1487,7 @@ class ProdutosPage extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final VoidCallback onAdd;
   final Future<void> Function(Produto produto) onDelete;
+  final void Function(Produto produto) onAddLote;
 
   Future<void> _confirmDelete(BuildContext context, Produto produto) async {
     final confirmed = await showDialog<bool>(
@@ -1055,6 +1555,7 @@ class ProdutosPage extends StatelessWidget {
                 minimum: produto.estoqueMinimo,
                 status: below ? 'Baixo' : 'Normal',
                 onDelete: () => _confirmDelete(context, produto),
+                onAddLote: () => onAddLote(produto),
               );
             }),
         ],
@@ -1174,7 +1675,7 @@ class ValidadePage extends StatelessWidget {
     );
   }
 }
-
+//parte 4
 // ---------------------------------------------------------------------------
 // Componentes de apoio
 // ---------------------------------------------------------------------------
@@ -1398,6 +1899,7 @@ class _ProductCard extends StatelessWidget {
   final int minimum;
   final String status;
   final VoidCallback onDelete;
+  final VoidCallback onAddLote;
 
   const _ProductCard({
     required this.name,
@@ -1407,6 +1909,7 @@ class _ProductCard extends StatelessWidget {
     required this.minimum,
     required this.status,
     required this.onDelete,
+    required this.onAddLote,
   });
 
   @override
@@ -1458,6 +1961,21 @@ class _ProductCard extends StatelessWidget {
                 Text(
                   'Disponível: $stock • Mínimo: $minimum',
                   style: const TextStyle(fontSize: 12, color: _kMuted),
+                ),
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: onAddLote,
+                  style: TextButton.styleFrom(
+                    foregroundColor: _kGreen,
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.add_box_outlined, size: 18),
+                  label: const Text(
+                    'Adicionar lote',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ],
             ),

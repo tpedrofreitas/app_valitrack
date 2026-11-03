@@ -542,6 +542,41 @@ class _AppShellState extends State<AppShell> {
     return null;
   }
 
+  Future<void> _showSaidaDialog(Produto produto, int disponivel) async {
+    if (disponivel <= 0) {
+      _showSnack('Este produto não tem estoque disponível para saída.');
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _SaidaFormDialog(
+        produto: produto,
+        disponivel: disponivel,
+        onSubmit: (payload) => _createSaida(produto, payload),
+      ),
+    );
+  }
+
+  /// Retorna a mensagem de erro, ou null se deu certo.
+  Future<String?> _createSaida(
+    Produto produto,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      await _api.createSaida(produto.id, payload);
+    } catch (e) {
+      return _errorMessage(e);
+    }
+
+    if (mounted) {
+      _showSnack('Saída registrada com sucesso');
+      _loadAll();
+    }
+    return null;
+  }
+
   Future<void> _deleteProduct(Produto produto) async {
     try {
       await _api.deleteProduto(produto.id);
@@ -610,6 +645,7 @@ class _AppShellState extends State<AppShell> {
         onAdd: _showAddProductDialog,
         onDelete: _deleteProduct,
         onAddLote: _showAddLoteDialog,
+        onSaida: _showSaidaDialog,
       ),
       ValidadePage(
         lotes: _lotes,
@@ -664,7 +700,7 @@ class _AppShellState extends State<AppShell> {
     );
   }
 }
-//parte 2
+
 // ---------------------------------------------------------------------------
 // Formulário de cadastro de produto (com lote e validade opcionais)
 // ---------------------------------------------------------------------------
@@ -1163,8 +1199,9 @@ class _LoteFormDialogState extends State<_LoteFormDialog> {
                 decoration: const InputDecoration(labelText: 'Quantidade'),
                 validator: (v) {
                   final n = int.tryParse(v?.trim() ?? '');
-                  if (n == null || n < 1)
+                  if (n == null || n < 1) {
                     return 'Informe uma quantidade válida';
+                  }
                   return null;
                 },
               ),
@@ -1250,7 +1287,7 @@ class _LoteFormDialogState extends State<_LoteFormDialog> {
     );
   }
 }
-//parte 3
+
 // ---------------------------------------------------------------------------
 // Páginas
 // ---------------------------------------------------------------------------
@@ -1443,6 +1480,7 @@ class ProdutosPage extends StatelessWidget {
     required this.onAdd,
     required this.onDelete,
     required this.onAddLote,
+    required this.onSaida,
   });
 
   final List<Produto> produtos;
@@ -1453,6 +1491,7 @@ class ProdutosPage extends StatelessWidget {
   final VoidCallback onAdd;
   final Future<void> Function(Produto produto) onDelete;
   final void Function(Produto produto) onAddLote;
+  final void Function(Produto produto, int disponivel) onSaida;
 
   Future<void> _confirmDelete(BuildContext context, Produto produto) async {
     final confirmed = await showDialog<bool>(
@@ -1508,6 +1547,7 @@ class ProdutosPage extends StatelessWidget {
               final categoria =
                   produto.categoria?.nome ?? resumo?.categoria ?? '';
               final below = resumo?.abaixoDoMinimo ?? false;
+              final disponivel = resumo?.estoqueDisponivel ?? 0;
 
               return _ProductCard(
                 name: produto.nome,
@@ -1516,11 +1556,12 @@ class ProdutosPage extends StatelessWidget {
                     : '$categoria • ${produto.codigoBarras}',
                 manufacturer:
                     '${produto.fabricante} • ${produto.unidadeMedida}',
-                stock: resumo?.estoqueDisponivel ?? 0,
+                stock: disponivel,
                 minimum: produto.estoqueMinimo,
                 status: below ? 'Baixo' : 'Normal',
                 onDelete: () => _confirmDelete(context, produto),
                 onAddLote: () => onAddLote(produto),
+                onSaida: () => onSaida(produto, disponivel),
               );
             }),
         ],
@@ -1640,7 +1681,7 @@ class ValidadePage extends StatelessWidget {
     );
   }
 }
-//parte 4
+
 // ---------------------------------------------------------------------------
 // Componentes de apoio
 // ---------------------------------------------------------------------------
@@ -1865,6 +1906,7 @@ class _ProductCard extends StatelessWidget {
   final String status;
   final VoidCallback onDelete;
   final VoidCallback onAddLote;
+  final VoidCallback onSaida;
 
   const _ProductCard({
     required this.name,
@@ -1875,6 +1917,7 @@ class _ProductCard extends StatelessWidget {
     required this.status,
     required this.onDelete,
     required this.onAddLote,
+    required this.onSaida,
   });
 
   @override
@@ -1928,19 +1971,44 @@ class _ProductCard extends StatelessWidget {
                   style: const TextStyle(fontSize: 12, color: _kMuted),
                 ),
                 const SizedBox(height: 4),
-                TextButton.icon(
-                  onPressed: onAddLote,
-                  style: TextButton.styleFrom(
-                    foregroundColor: _kGreen,
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  icon: const Icon(Icons.add_box_outlined, size: 18),
-                  label: const Text(
-                    'Adicionar lote',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
+                Wrap(
+                  spacing: 12,
+                  children: [
+                    TextButton.icon(
+                      onPressed: onAddLote,
+                      style: TextButton.styleFrom(
+                        foregroundColor: _kGreen,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.add_box_outlined, size: 18),
+                      label: const Text(
+                        'Adicionar lote',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: onSaida,
+                      style: TextButton.styleFrom(
+                        foregroundColor: _kDark,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.remove_circle_outline, size: 18),
+                      label: const Text(
+                        'Registrar saída',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -2165,6 +2233,171 @@ class _ValidadeCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Formulário de saída de estoque
+// ---------------------------------------------------------------------------
+
+class _SaidaFormDialog extends StatefulWidget {
+  const _SaidaFormDialog({
+    required this.produto,
+    required this.disponivel,
+    required this.onSubmit,
+  });
+
+  final Produto produto;
+  final int disponivel;
+  final Future<String?> Function(Map<String, dynamic> payload) onSubmit;
+
+  @override
+  State<_SaidaFormDialog> createState() => _SaidaFormDialogState();
+}
+
+class _SaidaFormDialogState extends State<_SaidaFormDialog> {
+  static const _motivos = ['Venda', 'Perda', 'Vencimento', 'Outro'];
+
+  final _formKey = GlobalKey<FormState>();
+  final _quantidadeController = TextEditingController();
+  final _observacaoController = TextEditingController();
+
+  String _motivo = _motivos.first;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _quantidadeController.dispose();
+    _observacaoController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    final observacao = _observacaoController.text.trim();
+    final payload = <String, dynamic>{
+      'quantidade': int.parse(_quantidadeController.text.trim()),
+      'motivo': _motivo,
+      if (observacao.isNotEmpty) 'observacao': observacao,
+    };
+
+    final error = await widget.onSubmit(payload);
+    if (!mounted) return;
+
+    if (error == null) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _saving = false;
+        _error = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Registrar saída'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.produto.nome,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _kDark,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Disponível: ${widget.disponivel}',
+                style: const TextStyle(fontSize: 12, color: _kMuted),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _quantidadeController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Quantidade'),
+                validator: (v) {
+                  final n = int.tryParse(v?.trim() ?? '');
+                  if (n == null || n < 1) {
+                    return 'Informe uma quantidade válida';
+                  }
+                  if (n > widget.disponivel) {
+                    return 'Máximo disponível: ${widget.disponivel}';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _motivo,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Motivo'),
+                items: _motivos
+                    .map(
+                      (m) => DropdownMenuItem<String>(value: m, child: Text(m)),
+                    )
+                    .toList(),
+                onChanged: _saving
+                    ? null
+                    : (value) {
+                        if (value != null) setState(() => _motivo = value);
+                      },
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _observacaoController,
+                maxLength: 500,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Observação (opcional)',
+                  counterText: '',
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: _kRed, fontSize: 13),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Salvar'),
+        ),
+      ],
     );
   }
 }

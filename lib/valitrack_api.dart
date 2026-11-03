@@ -405,4 +405,8 @@ class ValitrackApiService {
   Future<void> createLote(int produtoId, Map<String, dynamic> payload) async {
     await _client.post('/produtos/$produtoId/lotes', payload);
   }
+
+  Future<void> createSaida(int produtoId, Map<String, dynamic> payload) async {
+    await _client.post('/produtos/$produtoId/saidas', payload);
+  }
 }

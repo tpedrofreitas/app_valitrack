@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:app_valitrack/valitrack_api.dart';
 
@@ -446,7 +448,8 @@ class _AppShellState extends State<AppShell> {
       _showSnack(
         _loading
             ? 'Aguarde o carregamento dos dados.'
-            : 'Cadastre uma categoria na API antes de adicionar produtos.',
+            : (_error ??
+                  'Cadastre uma categoria na API antes de adicionar produtos.'),
       );
       return;
     }
@@ -725,6 +728,7 @@ class _ProductFormDialog extends StatefulWidget {
 }
 
 class _ProductFormDialogState extends State<_ProductFormDialog> {
+  final _api = ValitrackApiService();
   final _formKey = GlobalKey<FormState>();
   final _nomeController = TextEditingController();
   final _codigoController = TextEditingController();
@@ -746,6 +750,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   bool _saving = false;
   String? _error;
 
+  Timer? _debounce;
+  bool _buscando = false;
+  String? _ultimoCodigoBuscado;
+
   bool get _canAddLote => widget.fornecedores.isNotEmpty;
 
   @override
@@ -758,10 +766,12 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       _fornecedorId = widget.fornecedores.first.id;
     }
     _addLote = _canAddLote;
+    _codigoController.addListener(_onCodigoChanged);
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _nomeController.dispose();
     _codigoController.dispose();
     _fabricanteController.dispose();
@@ -811,6 +821,54 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       _validade = picked;
       _validadeController.text = _formatDate(picked);
     });
+  }
+
+  /// Dispara a busca quando o código digitado tem tamanho de EAN/GTIN válido.
+  void _onCodigoChanged() {
+    _debounce?.cancel();
+    final codigo = _codigoController.text.trim();
+
+    // EAN-8, UPC-A (12), EAN-13, GTIN-14
+    final valido = RegExp(r'^\d{8}$|^\d{12,14}$').hasMatch(codigo);
+    if (!valido || codigo == _ultimoCodigoBuscado) return;
+
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _buscarProduto(codigo);
+    });
+  }
+
+  Future<void> _buscarProduto(String codigo) async {
+    if (!mounted) return;
+    setState(() => _buscando = true);
+    _ultimoCodigoBuscado = codigo;
+
+    try {
+      final produto = await _api.consultarCodigoBarras(codigo);
+      if (!mounted) return;
+
+      // Ignora resposta antiga se o usuário já mudou o código.
+      if (_codigoController.text.trim() != codigo) return;
+
+      if (produto == null) {
+        setState(
+          () => _error = 'Produto não encontrado. Preencha manualmente.',
+        );
+        return;
+      }
+
+      setState(() {
+        _error = null;
+        if (produto.nome.isNotEmpty) _nomeController.text = produto.nome;
+        if (produto.fabricante.isNotEmpty) {
+          _fabricanteController.text = produto.fabricante;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = _errorMessage(e));
+    } finally {
+      if (mounted) setState(() => _buscando = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -883,10 +941,21 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               TextFormField(
                 controller: _codigoController,
                 maxLength: 50,
+                keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Código de barras',
                   counterText: '',
+                  suffixIcon: _buscando
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
                 ),
                 validator: (v) => _required(v, 'Informe o código de barras'),
               ),

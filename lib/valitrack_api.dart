@@ -2,10 +2,20 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+// ============================================================================
+// CONFIG
+// ============================================================================
+
 class ApiConfig {
+  // Se o seu endpoint for /api/produtos/... (sem v1), troque o defaultValue
+  // para 'http://10.0.2.2:8000/api' ou use:
+  // --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
+  //
+  // Emulador Android: 10.0.2.2 (127.0.0.1 seria o próprio emulador).
+  // Celular físico: use o IP da sua máquina na rede.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000/api/v1',
+    defaultValue: 'http://10.0.2.2:8000/api',
   );
 
   static String buildUrl(String endpoint) {
@@ -30,24 +40,30 @@ class ApiException implements Exception {
       'ApiException(statusCode: $statusCode, message: $message)';
 }
 
+// ============================================================================
+// CLIENTE HTTP
+// ============================================================================
+
 class ApiClient {
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
 
-  Future<dynamic> get(String endpoint) async {
+  static const Duration _defaultTimeout = Duration(seconds: 10);
+
+  Never _timeout() =>
+      throw ApiException('Tempo limite excedido ao conectar com a API.', 408);
+
+  Future<dynamic> get(
+    String endpoint, {
+    Duration timeout = _defaultTimeout,
+  }) async {
     final response = await _client
         .get(
           Uri.parse(ApiConfig.buildUrl(endpoint)),
           headers: {'Accept': 'application/json'},
         )
-        .timeout(
-          const Duration(seconds: 10),
-          onTimeout: () => throw ApiException(
-            'Tempo limite excedido ao conectar com a API.',
-            408,
-          ),
-        );
+        .timeout(timeout, onTimeout: _timeout);
     return _handleResponse(response);
   }
 
@@ -61,13 +77,7 @@ class ApiClient {
           },
           body: jsonEncode(body),
         )
-        .timeout(
-          const Duration(seconds: 10),
-          onTimeout: () => throw ApiException(
-            'Tempo limite excedido ao conectar com a API.',
-            408,
-          ),
-        );
+        .timeout(_defaultTimeout, onTimeout: _timeout);
     return _handleResponse(response);
   }
 
@@ -81,13 +91,7 @@ class ApiClient {
           },
           body: jsonEncode(body),
         )
-        .timeout(
-          const Duration(seconds: 10),
-          onTimeout: () => throw ApiException(
-            'Tempo limite excedido ao conectar com a API.',
-            408,
-          ),
-        );
+        .timeout(_defaultTimeout, onTimeout: _timeout);
     return _handleResponse(response);
   }
 
@@ -97,13 +101,7 @@ class ApiClient {
           Uri.parse(ApiConfig.buildUrl(endpoint)),
           headers: {'Accept': 'application/json'},
         )
-        .timeout(
-          const Duration(seconds: 10),
-          onTimeout: () => throw ApiException(
-            'Tempo limite excedido ao conectar com a API.',
-            408,
-          ),
-        );
+        .timeout(_defaultTimeout, onTimeout: _timeout);
     return _handleResponse(response);
   }
 
@@ -138,9 +136,11 @@ class ApiClient {
       }
       if (decoded['errors'] is Map) {
         final errors = decoded['errors'] as Map;
-        final firstError = errors.values.first;
-        if (firstError is List && firstError.isNotEmpty) {
-          return firstError.first.toString();
+        if (errors.isNotEmpty) {
+          final firstError = errors.values.first;
+          if (firstError is List && firstError.isNotEmpty) {
+            return firstError.first.toString();
+          }
         }
       }
     }
@@ -155,6 +155,10 @@ class ApiClient {
     return body.isNotEmpty ? body : 'Erro inesperado na API';
   }
 }
+
+// ============================================================================
+// MODELOS
+// ============================================================================
 
 class Categoria {
   Categoria({required this.id, required this.nome, required this.descricao});
@@ -261,6 +265,37 @@ class Produto {
   }
 }
 
+/// Resultado da consulta de código de barras (Open Food Facts etc.).
+/// Formato diferente de [Produto]: não tem id nem categoria_id.
+class ProdutoConsulta {
+  ProdutoConsulta({
+    required this.gtin,
+    required this.nome,
+    required this.fabricante,
+    required this.categoria,
+    this.imagem,
+    this.fonte,
+  });
+
+  factory ProdutoConsulta.fromJson(Map<String, dynamic> json) {
+    return ProdutoConsulta(
+      gtin: json['gtin']?.toString() ?? '',
+      nome: json['nome']?.toString() ?? '',
+      fabricante: json['fabricante']?.toString() ?? '',
+      categoria: json['categoria']?.toString() ?? '',
+      imagem: json['imagem']?.toString(),
+      fonte: json['fonte']?.toString(),
+    );
+  }
+
+  final String gtin;
+  final String nome;
+  final String fabricante;
+  final String categoria;
+  final String? imagem;
+  final String? fonte;
+}
+
 class LoteEstoque {
   LoteEstoque({
     required this.id,
@@ -347,6 +382,10 @@ class EstoqueResumo {
   final bool abaixoDoMinimo;
 }
 
+// ============================================================================
+// SERVIÇO
+// ============================================================================
+
 class ValitrackApiService {
   ValitrackApiService({ApiClient? client}) : _client = client ?? ApiClient();
 
@@ -408,5 +447,27 @@ class ValitrackApiService {
 
   Future<void> createSaida(int produtoId, Map<String, dynamic> payload) async {
     await _client.post('/produtos/$produtoId/saidas', payload);
+  }
+
+  /// Consulta dados do produto pelo código de barras (nome, fabricante...).
+  /// Retorna null se não encontrado (404).
+  Future<ProdutoConsulta?> consultarCodigoBarras(String codigoBarras) async {
+    try {
+      final response = await _client.get(
+        '/produtos/codigo/${Uri.encodeComponent(codigoBarras)}',
+        // Depende de serviço externo, então damos mais tempo.
+        timeout: const Duration(seconds: 20),
+      );
+      if (response is! Map<String, dynamic>) return null;
+      return ProdutoConsulta.fromJson(response);
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  Future<Produto> getProdutoPorCodigoBarras(String codigoBarras) async {
+    final response = await _client.get('/produtos/codigo/$codigoBarras');
+    return Produto.fromJson(response as Map<String, dynamic>);
   }
 }
